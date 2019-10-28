@@ -4,9 +4,10 @@
 
 Go Mod 使用
 ```bash
-go mod init     # 初始化
+go mod init     # 初始化（当项目不在GOPATH下时需要在后面加上package名字
 go mod download # 下载所有依赖
-go mod tiny     # 移除不需要的依赖包
+go mod tidy     # 移除不需要的依赖包
+go build        # 构建项目并自动分析依赖包，写入go.mod
 
 ```
 
