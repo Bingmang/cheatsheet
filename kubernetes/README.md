@@ -15,7 +15,7 @@ virsh -c qemu:///system list
 
 下载地址：https://github.com/kubernetes/minikube/releases
 
-```bash
+```sh
 wget https://github.com/kubernetes/minikube/releases/download/v1.5.1/minikube-linux-amd64
 mv minikube-linux-amd64 minikube
 sudo install minikube /usr/local/bin/minikube
@@ -23,7 +23,7 @@ sudo install minikube /usr/local/bin/minikube
 
 在安装minikube的时候，国内会被墙，导致镜像下载失败，参考阿里云的安装教程即可：https://yq.aliyun.com/articles/221687
 
-```bash
+```sh
 minikube start --image-mirror-country cn \
     --iso-url=https://kubernetes.oss-cn-hangzhou.aliyuncs.com/minikube/iso/minikube-v1.5.0.iso \
     --registry-mirror=https://xxxxxx.mirror.aliyuncs.com
@@ -42,7 +42,9 @@ kubectl version
 
 注：`alias k=kubectl`
 
-假设现有资源：`kubia-pod`、`kubia-service`、`kubia-node`、`kubia-container`、`kubia-rc`等
+假设现有资源：`kubia-pod`、`kubia-service`、`kubia-node`、`kubia-container`、`kubia-rc`、`kubia-ns`等
+
+假设使用的标签为：`env: (dev, debug, prod)`
 
 ### 查询
 
@@ -57,7 +59,7 @@ k describe node/pod/svc kubia
 k get nodes/pods/svc/rc/ns [-o wide] [--show-labels] [-L [LabelKey,]]
 
 # 获取日志（如果有多个容器则需要指定容器）
-k logs kubia-pod [-c kubia-container]
+k logs kubia-pod [-c kubia-container] [--previous]
 
 # 获取已部署pod的完整YAML
 k get po kubia-pod -o yaml
@@ -86,6 +88,13 @@ k scale rc kubia-rc --replicas=3
 # 使用配置文件创建资源
 k create -f kubia-manual.yaml
 
+# 移除Pod（通过标签删除需要30秒）
+k delete po kubia-pod kubia-pod2
+k delete po -l env=prod
+k delete po --all
+
+# 删除当前命名空间下的所有资源（30秒）
+k delete all --all
 ```
 
 ### 标签、注解
@@ -110,7 +119,21 @@ k describe pod kubia-pod | grep Annotations
 ### 命名空间
 
 ```sh
+# 查询命名空间下的pods
+k get po -n kube-system
 
+# 创建命名空间
+k create ns kubia-ns
+
+# 创建Pod
+k create -f kubia-pod.yaml -n kubia-ns
+
+# 快速切换命名空间
+alias kcd='kubectl config set-context $(kubectl config current-context) --namespace'
+kcd kubia-ns
+
+# 删除命名空间（连带下面的pods，需要30秒）
+k delete ns kubia-ns
 ```
 
 ## 配置文件
@@ -127,8 +150,14 @@ metadata:
 spec:
   # 节点选择器
   nodeSelector:
-    gpu: "true
+    gpu: "true"
   containers:
   - image: bingmang/kubia
     name: kubia
+    # 存活探针
+    livenessProbe:
+      httpGet:
+        path: /
+        port: 8080
+      initialDelaySeconds: 15 # 容器启动后15秒再开始探测
 ```
