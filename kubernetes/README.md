@@ -42,21 +42,93 @@ kubectl version
 
 注：`alias k=kubectl`
 
+假设现有资源：`kubia-pod`、`kubia-service`、`kubia-node`、`kubia-container`、`kubia-rc`等
+
+### 查询
+
 ```sh
 # 集群相关
 k cluster-info
 
 # 状态描述
-k describe node/pod/svc [Name] 
+k describe node/pod/svc kubia 
 
 # 获取信息
-k get nodes/pods/svc/rc [-o wide]
+k get nodes/pods/svc/rc/ns [-o wide] [--show-labels] [-L [LabelKey,]]
+
+# 获取日志（如果有多个容器则需要指定容器）
+k logs kubia-pod [-c kubia-container]
+
 # 获取已部署pod的完整YAML
-k get po [PodName] -o yaml
+k get po kubia-pod -o yaml
 
+# 获取API描述
+k explain pods/pod.spec/pod.metadata
+```
+
+### 网络
+
+```sh
 # 暴露ReplicationController，分配负载均衡的Service
-k expose rc [ReplicationControllerName] --type=LoadBalancer --name [ServiceName]
+k expose rc kubia-rc --type=LoadBalancer --name kubia-service-http
+minikube service kubia-service-http
 
+# 本地端口转发（调试用，前台进程）
+k port-forward kubia-pod 8888:8080
+```
+
+### Pods操作
+
+```sh
 # 伸缩pods
-k scale rc [ReplicationControllerName] --replicas=3
+k scale rc kubia-rc --replicas=3
+
+# 使用配置文件创建资源
+k create -f kubia-manual.yaml
+
+```
+
+### 标签、注解
+
+```sh
+# 加标签（改标签）
+k label po kubia-pod env=prod [--overwrite]
+k label node kubia-node gpu=true
+
+# 使用标签筛选器
+k get po -l env=prod
+k get po -l env in (prod, debug)
+k get po -l env notin (prod, debug)
+k get po -l 'env!=prod'
+k get po -l '!env'
+
+# 添加注解
+k annotate pod kubia-pod jd.com/group="wxt yr"
+k describe pod kubia-pod | grep Annotations
+```
+
+### 命名空间
+
+```sh
+
+```
+
+## 配置文件
+
+### Pod
+
+```yaml
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: kubia-gpu
+
+spec:
+  # 节点选择器
+  nodeSelector:
+    gpu: "true
+  containers:
+  - image: bingmang/kubia
+    name: kubia
 ```
