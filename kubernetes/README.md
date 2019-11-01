@@ -37,3 +37,26 @@ chmod +x ./kubectl
 sudo mv ./kubectl /usr/local/bin/kubectl
 kubectl version
 ```
+
+## 常用指令
+
+注：`alias k=kubectl`
+
+```sh
+# 集群相关
+k cluster-info
+
+# 状态描述
+k describe node/pod/svc [Name] 
+
+# 获取信息
+k get nodes/pods/svc/rc [-o wide]
+# 获取已部署pod的完整YAML
+k get po [PodName] -o yaml
+
+# 暴露ReplicationController，分配负载均衡的Service
+k expose rc [ReplicationControllerName] --type=LoadBalancer --name [ServiceName]
+
+# 伸缩pods
+k scale rc [ReplicationControllerName] --replicas=3
+```
