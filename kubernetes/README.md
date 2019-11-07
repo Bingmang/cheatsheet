@@ -42,7 +42,7 @@ kubectl version
 
 注：`alias k=kubectl`
 
-假设现有资源：`kubia-pod`、`kubia-service`、`kubia-node`、`kubia-container`、`kubia-rc`、`kubia-ns`等
+假设现有资源：`kubia-pod`、`kubia-service`、`kubia-node`、`kubia-container`、`kubia-rc`、`kubia-rs`、`kubia-ns`等
 
 假设使用的标签为：`env: (dev, debug, prod)`
 
@@ -77,9 +77,13 @@ minikube service kubia-service-http
 
 # 本地端口转发（调试用，前台进程）
 k port-forward kubia-pod 8888:8080
+
+# 关闭网络连接接口（模拟故障）
+minikube ssh kubia-node
+sudo ifconfig eth0 down
 ```
 
-### Pods操作
+### 资源操作
 
 ```sh
 # 伸缩pods
@@ -87,6 +91,7 @@ k scale rc kubia-rc --replicas=3
 
 # 使用配置文件创建资源
 k create -f kubia-manual.yaml
+KUBE_EDITOR="/bin/zsh" k edit po kubia-pod
 
 # 移除Pod（通过标签删除需要30秒）
 k delete po kubia-pod kubia-pod2
@@ -95,6 +100,9 @@ k delete po --all
 
 # 删除当前命名空间下的所有资源（30秒）
 k delete all --all
+
+# 删除Controller，不删除Pods
+k delete kubia-rc --cascade=false
 ```
 
 ### 标签、注解
@@ -160,4 +168,61 @@ spec:
         path: /
         port: 8080
       initialDelaySeconds: 15 # 容器启动后15秒再开始探测
+```
+
+### ReplicaSet
+
+```yaml
+apiVersion: apps/v1beta2
+kind: ReplicaSet
+
+metadata:
+  name: kubia
+
+spec:
+  replicas: 3
+  # ReplicaSet比ReplicationController提供了更多的选择器
+  #（如果标签简单，可以省略selector，k8s会自动匹配template中的label）
+  selector:
+    matchLabels:
+      app: kubia
+    matchExpressions:
+      - key: app
+        operator: In  # In/NotIn/Exists/DoesNotExist
+        values:
+          - kubia
+  # Pod 模板
+  template:
+    metadata:
+      labels:
+        app: kubia
+    spec:
+      containers:
+      - name: kubia
+        image: bingmang/kubia
+```
+
+### DaemonSet
+
+```yaml
+apiVersion: apps/v1beta2
+kind: DaemonSet
+
+metadata:
+  name: prod-monitor
+
+spec:
+  selector:
+    matchLabels:
+      app: prod-monitor
+  template:
+    metadata:
+      lebels:
+        app: prod-monitor
+    spec:
+      nodeSelector:
+        env: prod
+      containers:
+      - name: main
+        image: bingmang/prod-monitor
 ```
