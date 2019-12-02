@@ -81,6 +81,10 @@ k port-forward kubia-pod 8888:8080
 # 关闭网络连接接口（模拟故障）
 minikube ssh kubia-node
 sudo ifconfig eth0 down
+
+# 在运行的容器中远程执行命令
+k exec kubia-7nog1 -- curl -s http://10.111.249.153
+k exec kubia-7nog1 env
 ```
 
 ### 资源操作
@@ -88,6 +92,8 @@ sudo ifconfig eth0 down
 ```sh
 # 伸缩pods
 k scale rc kubia-rc --replicas=3
+# 伸缩job（更改并行量）
+k scale job kubia-job --replicas 3
 
 # 使用配置文件创建资源
 k create -f kubia-manual.yaml
@@ -168,12 +174,18 @@ spec:
         path: /
         port: 8080
       initialDelaySeconds: 15 # 容器启动后15秒再开始探测
+    # 为端口命名，可以在Service中直接引用，无需写死端口号
+    ports:
+    - name: http
+      containerPort: 8080
+    - name: https
+      containerPort: 8443
 ```
 
 ### ReplicaSet
 
 ```yaml
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: ReplicaSet
 
 metadata:
@@ -205,7 +217,7 @@ spec:
 ### DaemonSet
 
 ```yaml
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: DaemonSet
 
 metadata:
@@ -225,4 +237,72 @@ spec:
       containers:
       - name: main
         image: bingmang/prod-monitor
+```
+
+### Job
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+
+metadata:
+  name: batch-job
+
+spec:
+  template:
+    metadata:
+      labels:
+        app: batch-job
+    spec:
+      completions: 5  # 顺序运行五个pod
+      parallelism: 2  # 最多两个pod可以并行运行
+      restartPolicy: OnFailure  # Always(default) or Never
+      containers:
+      - name: main
+        image: luksa/batch-job
+```
+
+### CronJob
+
+```yaml
+apiVersion: batch/v1
+kind: CronJob
+
+metadata:
+  name: batch-job-every-fifteen-minitues
+
+spec:
+  schedule: "0,15,30,45 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: periodic-batch-job
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: main
+            image: luksa/batch-job
+```
+
+### Service
+```yaml
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: kubia-svc
+
+spec:
+  sessionAffinity: ClientIP # None(default), 同一个IP会被打到同一个Pod上
+  ports:
+  - name: http  # 如果创建多端口映射，则需要指定name
+    port: 80
+    targetPort: 8080  # 如果Pod在创建时命名了端口号，可以直接引用，例如 targetPort: http
+  - name: https
+    port: 443
+    targetPort: 8080
+  selector:
+    app: kubia
 ```
