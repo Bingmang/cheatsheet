@@ -66,6 +66,10 @@ k get po kubia-pod -o yaml
 
 # 获取API描述
 k explain pods/pod.spec/pod.metadata
+
+# minikube插件
+minikube addons list
+minikube addons enable ingress
 ```
 
 ### 网络
@@ -85,6 +89,9 @@ sudo ifconfig eth0 down
 # 在运行的容器中远程执行命令
 k exec kubia-7nog1 -- curl -s http://10.111.249.153
 k exec kubia-7nog1 env
+
+# 获取所有节点IP（External或Internal）
+k get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}'
 ```
 
 ### 资源操作
@@ -95,8 +102,9 @@ k scale rc kubia-rc --replicas=3
 # 伸缩job（更改并行量）
 k scale job kubia-job --replicas 3
 
-# 使用配置文件创建资源
+# 使用配置文件创建资源、更新资源
 k create -f kubia-manual.yaml
+k apply -f kubia-manual.yaml
 KUBE_EDITOR="/bin/zsh" k edit po kubia-pod
 
 # 移除Pod（通过标签删除需要30秒）
@@ -174,6 +182,12 @@ spec:
         path: /
         port: 8080
       initialDelaySeconds: 15 # 容器启动后15秒再开始探测
+    # 就绪探针
+    readinessProbe:
+      exec:
+        command:
+        - ls
+        - /var/ready
     # 为端口命名，可以在Service中直接引用，无需写死端口号
     ports:
     - name: http
@@ -305,4 +319,90 @@ spec:
     targetPort: 8080
   selector:
     app: kubia
+```
+
+### Endpoints
+```yaml
+apiVersion: v1
+kind: Endpoints
+
+metadata:
+  name: external-svc  # 名称必须和Service的名称匹配
+
+subsets:
+  - addresses:
+    - ip: 11.11.11.11
+    - ip: 22.22.22.22
+    ports:
+    - port: 80
+```
+
+### NodePort
+```yaml
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: kubia-nodeport
+
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: 30123
+
+  selector:
+    app: kubia
+```
+
+### LoadBalancer
+```yaml
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: kubia-loadbalancer
+
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: kubia
+```
+
+### Ingress
+```yaml
+apiVersion: extensions/v1beta1
+kind: Ingress
+
+metadata:
+  name: kubia
+
+spec:
+  tls:
+  - hosts:
+    - kubia.example.com
+    secretName: tls-secret
+  rules:
+  - host: kubia.example.com
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: kubia-nodeport # 大部分代理商仅提供转发到NodePort
+          servicePort: 80
+  - host: bar.example.com
+    http:
+      paths:
+      - path: /foo
+        backend:
+          serviceName: foo
+          servicePort: 80
+      - path: /bar
+        backend:
+          serviceName: bar
+          servicePort: 80
 ```
